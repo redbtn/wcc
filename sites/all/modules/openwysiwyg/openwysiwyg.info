@@ -1,0 +1,13 @@
+; $Id $
+name = OpenWYSIWYG
+description = "Enables OpenWYSIWYG editor. Free cross-browser WYSIWYG editor."
+package = "Easy Module"
+project = "openwysiwyg"
+core = "6.x"
+version = "6.x-1.0-rc1"
+; Information added by drupal.org packaging script on 2009-06-25
+version = "6.x-1.0-rc1"
+core = "6.x"
+project = "openwysiwyg"
+datestamp = "1245947505"
+

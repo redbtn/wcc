@@ -1,0 +1,13 @@
+6.x-1.0-BETA2: Fixed: Conflict with Drupal file delete function
+               Fixed: openwysiwyg.css table layout
+
+6.x-1.0-BETA3: Fixed: Error when upload into sub-folder
+
+6.x-1.0-BETA4: Fixed: Fulljustify appear only on Windows but not on Linux Server
+               Fixed: Teaser uses excerpt module instead "break tag"
+
+6.x-1.0-BETA5: Fixed: Case sensitive. "Folder manage" to "folder manage"
+
+6.x-1.0-rc1:   Fixed: "Show editor on specific pages" from textfield to textarea
+               Fixed: Disable "add custom buttons" feature
+               Fixed: Replace '-' to '_' for arg(2) when add new content

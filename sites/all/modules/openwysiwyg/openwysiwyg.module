@@ -1,0 +1,1118 @@
+<?php
+/* $Id: openwysiwyg.module,v 1.28 2009/06/25 16:26:36 thenicespider Exp $ */
+
+/**
+ * Display help and module information
+ * @param section which section of the site we're displaying help
+ * @return help text for section
+ */
+function openwysiwyg_help($section='') {
+  $output = '';
+  switch ($section) {
+    case 'admin/settings/help#description':
+      $output = t("Enables openwysiwyg WYSIWYG editor.");
+      break;
+    case "admin/help#openwysiwyg":
+      $output = t("Enables openwysiwyg WYSIWYG editor.");
+      break;
+    case "admin/settings/openwysiwyg/custombuttons":
+      $output = t("<p>You can add extra buttons to the openwysiwyg editor on this page. 
+      This allows you to specify HTML code and tags for your users to use. 
+      The instructions below tell you how to add a custom button. 
+      In this example we want to add a button that transforms selected text into superscript, by using the &lt;sup&gt; tags.</p>
+      <ul>
+        <li>Specify a name for your custom button in the table below. Don't use spaces or special characters. Example: <em>sup</em></li>
+        <li>Specify the tag that should be provided by your custom button in the next column. You shouldn't specify the closing tag.
+        Example: <em>&lt;sup&gt;</em></li>
+        <li>If you save this page, the button will be available in the 'Toolbar settings' on the 'Settings' tab. 
+        Just add it to the button list. Note: This will only work if you chose the option 'As specified below:' for the toolbar.
+        It will not work when you have selected 'All'.</li>
+        <li>Optionally, you can supply an image to be used for this custom button. 
+        Create a file named '&lt;name&gt;.gif' in the buttons directory of the openwysiwyg module folder. 
+        Example: <em>sup.gif</em></li>
+      </ul>
+      Note: the Tag field can also have tags with parameters, 
+      for example <em>&lt;span style=\"color:red;\"&gt;</em> will give selected text a red color.
+      ");
+      break;
+  }
+  return $output;
+}
+
+// Valid permissions for this module
+function openwysiwyg_perm() {
+  return array('access openwysiwyg', 'administer openwysiwyg',
+	'file browse', 'file delete', 'file upload','file resize', 
+	'folder create', 'folder delete', 'folder manage',
+	'toolbar buttons: full', 'toolbar buttons: custom');
+}
+
+// Implementation of hook_menu().
+function openwysiwyg_menu() {
+  $items = array(); 
+  
+  $items['admin/settings/openwysiwyg'] = array(
+    'title'            => 'OpenWYSIWYG',
+    'description'      => 'Enables OpenWYSIWYG.',
+    'access arguments' => array('administer openwysiwyg'),
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('openwysiwyg_admin_settings'),
+    'type'             => MENU_NORMAL_ITEM,
+    'file'             => 'openwysiwyg.settings.inc',
+  );
+  
+  $items['admin/settings/openwysiwyg/settings'] = array(
+    'title'            => 'Basic Settings',
+    'access arguments' => array('administer openwysiwyg'),
+    'weight'           => -10,
+    'type'             => MENU_DEFAULT_LOCAL_TASK,
+    'file'             => 'openwysiwyg.settings.inc',
+  );
+  
+  $items['admin/settings/openwysiwyg/visibility'] = array(
+    'title'            => 'Visibility',
+    'description'      => 'Openwysiwyg Visibility',
+    'access arguments' => array('administer openwysiwyg'),
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('openwysiwyg_settings_visibility'),
+    'type'             => MENU_LOCAL_TASK,
+    'file'             => 'openwysiwyg.settings.inc',
+  );
+  
+  $items['admin/settings/openwysiwyg/browser'] = array(
+    'title'            => 'File Browser',
+    'description'      => 'Openwysiwyg File Browser',
+    'access arguments' => array('administer openwysiwyg'),
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('openwysiwyg_settings_file_browser'),
+    'type'             => MENU_LOCAL_TASK,
+    'file'             => 'openwysiwyg.settings.inc',
+  );
+  
+  /*
+  $items['admin/settings/openwysiwyg/configs'] = array(
+    'title'            => 'Custom Buttons',
+    'description'      => 'Custom Buttons',
+    'access arguments' => array('administer openwysiwyg'),
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('openwysiwyg_settings_custombuttons'),
+    'type'             => MENU_LOCAL_TASK,
+    'file'             => 'openwysiwyg.settings.inc',
+    'weight'           => '50',
+  );
+  */
+  
+  $items['openwysiwyg/image_form'] = array(
+    'title'            => 'Image Form',
+    'description'      => 'Image Form',
+    'access arguments' => array('access openwysiwyg'),
+    'page callback'    => 'openwysiwyg_ow_image_form',
+    'type'             => MENU_CALLBACK,
+  );
+  
+  //File Browse 
+  $items['openwysiwyg/image_browse'] = array(
+    'access arguments' => array('access openwysiwyg'),
+    'page callback' => 'openwysiwyg_ow_image_browse',
+    //'page arguments' => $folder_name,$sub_folder,$error_msg,
+    'page arguments' => array($error_msg),
+    'type' => MENU_CALLBACK,
+  );
+     
+  //File Delete
+  
+  $items['openwysiwyg/file_delete'] = array(
+    'access arguments' => array('access openwysiwyg'),
+    'page callback'    => 'openwysiwyg_ow_file_delete',
+    'type' => MENU_CALLBACK,
+  );
+
+  //Folder create
+  $items['openwysiwyg/folder_create'] = array(
+    'access arguments' => array('access openwysiwyg'),
+    'page callback'    => 'openwysiwyg_ow_folder_create',
+    //'page arguments' => $folder_name, $sub_folder, $new_folder,
+    'type' => MENU_CALLBACK,
+  );
+    
+  //File Upload
+  $items['openwysiwyg/file_upload'] = array(
+    'access arguments' => array('access openwysiwyg'),
+    'page callback'    => 'openwysiwyg_ow_file_upload',
+    //'page arguments' => $_REQUEST['folder_name'],$_FILES['file_upload'],
+    'type' => MENU_CALLBACK,
+  );
+
+  //Image Resize Form
+  $items['openwysiwyg/file_resize_form'] = array(
+    'access arguments' => array('access openwysiwyg'),
+    'page callback'    => 'openwysiwyg_ow_file_resize_form',
+    //'page arguments' => $folder_name,$file_name,
+    'type' => MENU_CALLBACK,
+  );
+  
+  //Image Resize Action      
+  $items['openwysiwyg/file_resize_action'] = array(
+    'access arguments' => array('access openwysiwyg'),
+    'page callback'    => 'openwysiwyg_ow_file_resize_action',
+    //'page arguments' => $folder_name, $file_name,$resize_width,$resize_height,$resize_name,
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+/**
+ * Implementation of hook_elements() to show the openwysiwyg editor when a textarea is loaded
+ */
+function openwysiwyg_elements(){
+  $type = array(); 
+  if (user_access('access openwysiwyg')) {
+    $type['textarea'] = array('#process' => array('openwysiwyg_process_textarea'));
+  }
+  return $type;
+}
+
+/**
+ * Implementation of hook_form_alter()
+ */
+function openwysiwyg_form_alter(&$form, &$form_state) {
+	// disable 'teaser' textarea
+	unset($form['body_field']['teaser_js']);
+	$form['body_field']['teaser_include'] = array();
+}
+
+// Modify the textarea to show openwysiwyg editor if certain conditions are met. 
+// function openwysiwyg_change_textarea($element) {
+
+function openwysiwyg_process_textarea($element) {
+  static $openwysiwyg_ready = FALSE;
+  
+  if (arg(0) == 'node' && is_numeric(arg(1)) && arg(2)=='edit') {
+    $node = node_load(arg(1));
+    $form_type = $node->type;
+  }
+  if (arg(0) == 'node' && arg(1)=='add') {
+    $form_type = str_replace('-','_',arg(2));
+  }
+	
+  $openwysiwyg_enable = 0;
+	
+  if(_openwysiwyg_validate_element_id($element["#id"]) && _openwysiwyg_validate_content_type($form_type) && _openwysiwyg_allowed_pages()) {
+    $openwysiwyg_enable= 1;
+  } else {
+		$openwysiwyg_comment = variable_get('openwysiwyg_comment', 0);
+	  if ($openwysiwyg_comment && arg(0)=='comment') {
+	    $openwysiwyg_enable= 1;
+	  } 
+	}
+  
+  if ($openwysiwyg_enable) {
+    if (!$openwysiwyg_ready) {
+      // get the path for the buttom images
+      $base_path = base_path();
+      $openwysiwyg_path = $base_path.drupal_get_path('module', 'openwysiwyg');
+	    $buttonpath = $openwysiwyg_path.'/library/images/'; 
+	    $PopupsDir  = $openwysiwyg_path.'/library/popups/';   
+      // add the openwysiwyg js library
+      drupal_add_js(drupal_get_path('module','openwysiwyg').'/library/scripts/openwysiwyg.modified.js'); 
+      drupal_add_css(drupal_get_path('module','openwysiwyg')."/library/styles/".variable_get("openwysiwyg_style","openwysiwyg.css"));
+      
+      if (user_access('toolbar buttons: full')) {
+		    $toolbar_button1 = 'new Array("fonts","fontsizes","headings","bold","italic","underline","strikethrough","seperator",'.
+		                   '"forecolor","backcolor","seperator","justifyfull","justifyleft","justifycenter","justifyright",'.
+					       '"seperator","unorderedlist","orderedlist","outdent","indent")';
+		    $toolbar_button2 = 'new Array("subscript", "superscript", "seperator", "cut", "copy", "paste","removeformat",'.
+				           '"seperator","undo","redo","seperator","inserttable","insertimage","createlink","seperator",'.
+						   '"preview","print","seperator","viewSource","maximize","seperator","teaser","seperator","help")';
+		  } else {
+		    $openwysiwyg_toolbar_buttons_1 = strtolower(trim(variable_get('openwysiwyg_toolbar_buttons_1', 'bold italic underline strikethrough seperator unorderedlist orderedlist')));
+		    $openwysiwyg_toolbar_buttons_2 = strtolower(trim(variable_get('openwysiwyg_toolbar_buttons_2', 'subscript superscript seperator removeformat seperator inserttable insertimage')));
+				
+		    if ($openwysiwyg_toolbar_buttons_1=='') {
+		      $toolbar_button1 = '\'\'';
+		    } else {
+		      $values_arr = explode(' ',$openwysiwyg_toolbar_buttons_1);
+		      $toolbar_button1 = 'new Array(';
+		      foreach ($values_arr as $value) { $toolbar_button1 .= "\"$value\","; }
+		      $toolbar_button1 .= ')';
+		      $toolbar_button1 = str_replace(',)',')', $toolbar_button1);
+		    }
+				
+		    if ($openwysiwyg_toolbar_buttons_2=='') {
+		      $toolbar_button2 = '\'\'';
+		    } else {
+			    $values_arr = explode(' ',$openwysiwyg_toolbar_buttons_2);
+			    $toolbar_button2 = 'new Array(';
+			    foreach ($values_arr as $value) { $toolbar_button2 .= "\"$value\","; }
+			    $toolbar_button2 .= ')';
+			    $toolbar_button2 = str_replace(',)',')', $toolbar_button2);
+		    }
+	    }
+      
+      drupal_add_js("var mysettings = new WYSIWYG.Settings();
+        mysettings.ImagesDir = \"$buttonpath\";
+        mysettings.PopupsDir = \"$PopupsDir\";
+        mysettings.base_path = \"$base_path\";
+        mysettings.openwysiwyg_path = \"$openwysiwyg_path\";
+        mysettings.Toolbar[0] = $toolbar_button1;
+        mysettings.Toolbar[1] = $toolbar_button2;
+        ", inline);
+      $openwysiwyg_ready = TRUE;
+    } 
+		//$script = "mysettings.Toolbar[0] = new Array(". $buttons1 .");\n";   
+    //disable resize script
+    $element['#resizable'] = FALSE;
+    
+    //set the width & height of the textarea, so openwysiwyg can inherit this
+    $editor_width = variable_get('openwysiwyg_editor_width', '100%');
+    $editor_height = variable_get('openwysiwyg_editor_height', 0);
+    if($editor_height != 0){
+      // set both
+      $element['#attributes'] = array('style' => "width: $editor_width; height: $editor_height;");
+    }else{
+      // only set width
+      $element['#attributes'] = array('style' => "width: $editor_width;");
+    }
+    
+    // initialize openwysiwyg 
+    $element_id = $element['#id'];
+    drupal_add_js("WYSIWYG.attach('$element_id', mysettings);", inline);
+  }
+  return $element;
+}
+
+function openwysiwyg_settings_custombuttons_submit($form_id, $form_values) {
+  // unset any thing that was deleted
+  foreach ($form_values['openwysiwyg_custombuttons'] as $key => $val) {
+    if ($val['delete'] == '1' || $val['btnname'] == '') {
+      unset($form_values['openwysiwyg_custombuttons'][$key]);
+    }
+  }
+  system_settings_form_submit($form_id, $form_values);
+  drupal_goto('admin/settings/openwysiwyg/custombuttons');
+}
+
+function theme_openwysiwyg_settings_custombuttons(&$form) {    
+  foreach (element_children($form['openwysiwyg_custombuttons']) as $key) {
+    $row = array();
+    if (is_array($form['openwysiwyg_custombuttons'][$key]['btnname'])) {
+      $row[] = drupal_render($form['openwysiwyg_custombuttons'][$key]['btnname']);
+      $row[] = drupal_render($form['openwysiwyg_custombuttons'][$key]['btnvalue']);
+      $row[] = drupal_render($form['openwysiwyg_custombuttons'][$key]['delete']);
+    }
+    $rows[] = $row;
+  }
+  $header = array(t('Name'), t('Tag'), t('Delete'));
+  $output = theme('table', $header, $rows);
+  $output .= drupal_render($form);
+
+  return $output;
+}
+
+// Validation against textarea ID filters. 
+function _openwysiwyg_validate_element_id($id){
+  $valid = false;
+  // when returned valid, the openwysiwyg editor will be shown
+  $values = strtolower(str_replace(' ','',variable_get('openwysiwyg_textarea_id_val','edit-teaser,edit-body')));
+  $values_arr = split(',',$values);
+  // exclude some textfields that we need on the settings page from showing the editor
+  array_push($values_arr,'edit-openwysiwyg-textarea-id-val');
+  array_push($values_arr,'edit-openwysiwyg-visibility-path-val');  
+  array_push($values_arr,'edit-openwysiwyg-toolbar-buttons-list');
+  if(variable_get('openwysiwyg_textarea_id',1) == 0){
+    // don't show editor if id is found in values
+    if(!in_array($id,$values_arr)){
+      $valid = true; 
+    }
+  }else{
+    // only show editor if id is found in values
+    if(in_array($id,$values_arr)){
+      $valid = true; 
+    }
+  }
+  return $valid;
+}
+
+// Validation against content-type filters. 
+function _openwysiwyg_validate_content_type($content_type){
+  $valid = false;
+  // when returned valid, the openwysiwyg editor will be shown
+  $values = strtolower(str_replace(' ','',variable_get('openwysiwyg_content_type_val','page')));
+  $values_arr = split(',',$values);
+  // exclude some textfields that we need on the settings page from showing the editor
+  array_push($values_arr,'edit-openwysiwyg-textarea-id-val');
+  array_push($values_arr,'edit-openwysiwyg-visibility-path-val');  
+  array_push($values_arr,'edit-openwysiwyg-toolbar-buttons-list');
+  if(variable_get('openwysiwyg_content_type',1) == 0){
+    // don't show editor if id is found in values
+    if(!in_array($content_type,$values_arr)){$valid = true;}
+  }else{
+    // only show editor if id is found in values
+    if(in_array($content_type,$values_arr)){$valid = true;}
+  }
+  return $valid;
+}
+
+// Validation against pages filters. 
+function _openwysiwyg_allowed_pages() {
+  $openwysiwyg_page = variable_get('openwysiwyg_page','0');
+  $values = strtolower(str_replace(' ','',variable_get('openwysiwyg_page_val','')));
+  
+  if ($openwysiwyg_page < 2) {
+    $path = drupal_get_path_alias($_GET['q']);
+    $regexp = '/^('. preg_replace(array('/(\r\n?|\n)/', '/\\\\\*/', '/(^|\|)\\\\<front\\\\>($|\|)/'), array('|', '.*', '\1'. preg_quote(variable_get('site_frontpage', 'node'), '/') .'\2'), preg_quote($values, '/')) .')$/';
+    // Compare with the internal and path alias (if any).
+    $page_match = preg_match($regexp, $path);
+    if ($path != $_GET['q']) {
+      $page_match = $page_match || preg_match($regexp, $_GET['q']);
+    }
+    // When $block->visibility has a value of 0, the block is displayed on
+    // all pages except those listed in $block->pages. When set to 1, it
+    // is displayed only on those pages listed in $block->pages.
+    $page_match = !($openwysiwyg_page xor $page_match);
+  } else {
+    $page_match = drupal_eval($values);
+  }
+  return $page_match;
+}
+
+// Generate script for openwysiwyg toolbar creation in settings
+function _openwysiwyg_settings_toolbar_js(){
+  return "\n<script type=\"text/javascript\">
+    function addToToolbar1(txt){
+       var curText= $(\"#edit-openwysiwyg-toolbar-buttons-1\").val(); 
+       $(\"#edit-openwysiwyg-toolbar-buttons-1\").val(curText + ' ' + txt);
+    }
+    
+    function addToToolbar2(txt){
+       var curText= $(\"#edit-openwysiwyg-toolbar-buttons-2\").val(); 
+       $(\"#edit-openwysiwyg-toolbar-buttons-2\").val(curText + ' ' + txt);
+    }
+    </script>\n"; 
+}
+
+// Generate the toolbar buttons for the openwysiwyg settings page
+function _openwysiwyg_settings_toolbar($id){
+  $buttonspath = base_path().drupal_get_path('module', 'openwysiwyg').'/library/images/';
+  $output = '<div><strong>'. t('Click to add buttons').':</strong> <br>';
+  $i=0;
+  foreach(_openwysiwyg_buttonlist() as $btn){
+    $i++;
+    $path = $buttonspath.$btn.'.gif';
+    if ($i==16) { $output .= '<br>'; }
+    $output .= "<a href=\"javascript:addToToolbar$id('$btn');\"><img src=\"$path\" alt=\"$btn\" /></a> ";
+  }
+  /*
+  $output .= "<br /> <strong>". t('Add lists').":</strong> ";
+  foreach(_openwysiwyg_selectlist() as $sel){
+    $output .= "<a href=\"javascript:addToToolbar$id('$sel');\">$sel</a> ";
+  }
+  */
+  $custombtn_arr = variable_get("openwysiwyg_custombuttons", NULL);
+  if(!empty($custombtn_arr)){
+    $output .= "<br /> <strong>". t('Add custom buttons').":</strong> ";
+    foreach($custombtn_arr as $key => $val){
+      $btnname = $val['btnname'];
+      $output .= "<a href=\"javascript:addToToolbar$id('$btnname');\">$btnname</a> ";
+    }
+  }
+  
+  //$output .= "<br /> <strong>". t('Add separator').":</strong> ";
+  //$output .= "<a href=\"javascript:addToToolbar$id('|');\">seperator</a>";
+  $output .= '</div>';
+  return $output;
+}
+
+/*
+ * List of buttons to show for toolbar settings
+ */
+function _openwysiwyg_buttonlist(){
+  return array("fonts","fontsizes","headings","bold","italic","underline","strikethrough", "forecolor","backcolor", "justifyfull","justifyleft","justifycenter","justifyright","unorderedlist","orderedlist","outdent","indent", "subscript", "superscript", "cut", "copy", "paste","removeformat", "undo","redo","inserttable","insertimage","createlink", "preview","print","viewsource","maximize","seperator","teaser","seperator","help"
+  );
+}
+					
+/*
+ * List of selects (dropdownlists) to show for toolbar settings
+ */
+function _openwysiwyg_selectlist(){
+  return array("select_font", "select_size", "select_heading"
+  );
+}
+
+function openwysiwyg_ow_image_form() {
+  $base_path = base_path();
+  $openwysiwyg_path = $base_path.drupal_get_path('module', 'openwysiwyg'); 
+
+
+  //create predefine folder
+  $openwysiwyg_predefine_folder = variable_get('openwysiwyg_predefine_folder','');
+  if ($openwysiwyg_predefine_folder <> '') {
+    $openwysiwyg_predefine_folder_arr = split(',',$openwysiwyg_predefine_folder);
+    // someone might put a space between the comma and the next textarea id
+    foreach ($openwysiwyg_predefine_folder_arr as $value) {
+      $predefine_folder = $user_dir."/".trim($value);
+      if (file_exists($predefine_folder)) { 
+	    if (!is_dir($predefine_folder)) {
+		  mkdir($predefine_folder);	
+		}
+	  } else {
+	    mkdir($predefine_folder);	
+	  }
+    }
+  }
+  
+  $output  = '';
+  $output .= '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">';
+  $output .= '<html>';
+  $output .= '<head>';
+  $output .= '<title>openWYSIWYG | Insert or Modify Image</title>';
+
+  $output .= '<script type="text/javascript" src="'.$openwysiwyg_path.'/library/scripts/wysiwyg-popup.js"></script>';
+  $output .= '<script language="JavaScript" type="text/javascript">';
+  
+  $output .= "function GetValueFromChild(imgS,imgW,imgH) { \n";
+  $output .= "  document.getElementById('src').value = imgS; \n";
+  $output .= "  document.getElementById('width').value = imgW; \n";
+  $output .= "  document.getElementById('height').value = imgH; \n";
+  $output .= "} \n\n";
+  
+	$output .= '// ----------------------------------------------------------------------'."\n";
+  $output .= '//  Function: Inserts image into the WYSIWYG.'."\n";
+  $output .= '// ----------------------------------------------------------------------'."\n";
+  $output .= 'function insertImage() {'."\n";
+  $output .= '	var n = WYSIWYG_Popup.getParam(\'wysiwyg\');'."\n";
+  $output .= '	'."\n";
+  $output .= '	// get values from form fields'."\n";
+  $output .= '	var src = document.getElementById(\'src\').value;'."\n";
+  $output .= '	var alt = document.getElementById(\'alt\').value;'."\n";
+  $output .= '	var width = document.getElementById(\'width\').value'."\n";
+  $output .= '	var height = document.getElementById(\'height\').value'."\n";
+  $output .= '	var border = document.getElementById(\'border\').value'."\n";
+  $output .= '	var align = document.getElementById(\'align\').value'."\n";
+  $output .= '	var vspace = document.getElementById(\'vspace\').value'."\n";
+  $output .= '	var hspace = document.getElementById(\'hspace\').value'."\n";
+  $output .= '	'."\n";
+  $output .= '	// insert image'."\n";
+  $output .= '	WYSIWYG.insertImage(src, width, height, align, border, alt, hspace, vspace, n);'."\n";
+  $output .= '  	window.close();'."\n";
+  $output .= '}'."\n";
+
+  $output .= '// ----------------------------------------------------------------------'."\n";
+  $output .= '//  Function: load the settings of a selected image into the form fields'."\n";
+  $output .= '// ---------------------------------------------------------------------- '."\n";
+  $output .= 'function loadImage() {'."\n";
+  $output .= '	var n = WYSIWYG_Popup.getParam(\'wysiwyg\');'."\n";
+  $output .= '	'."\n";
+  $output .= '	// get selection and range'."\n";
+  $output .= '	var sel = WYSIWYG.getSelection(n);'."\n";
+  $output .= '	var range = WYSIWYG.getRange(sel);'."\n";
+  $output .= '	'."\n";
+  $output .= '	// the current tag of range'."\n";
+  $output .= '	var img = WYSIWYG.findParent("img", range);'."\n";
+  $output .= '	'."\n";
+  $output .= '	// if no image is defined then return'."\n";
+  $output .= '	if(img == null) return;'."\n";
+  $output .= '		'."\n";
+  $output .= '	// assign the values to the form elements'."\n";
+  $output .= '	for(var i = 0;i < img.attributes.length;i++) {'."\n";
+  $output .= '		var attr = img.attributes[i].name.toLowerCase();'."\n";
+  $output .= '		var value = img.attributes[i].value;'."\n";
+  $output .= '		//alert(attr + " = " + value);'."\n";
+  $output .= '		if(attr && value && value != "null") {'."\n";
+  $output .= '			switch(attr) {'."\n";
+  $output .= '				case "src": '."\n";
+  $output .= '					// strip off urls on IE'."\n";
+  $output .= '					if(WYSIWYG_Core.isMSIE) value = WYSIWYG.stripURLPath(n, value, false);'."\n";
+  $output .= '					document.getElementById(\'src\').value = value;'."\n";
+  $output .= '				break;'."\n";
+  $output .= '				case "alt":'."\n";
+  $output .= '					document.getElementById(\'alt\').value = value;'."\n";
+  $output .= '				break;'."\n";
+  $output .= '				case "align":'."\n";
+  $output .= '					selectItemByValue(document.getElementById(\'align\'), value);'."\n";
+  $output .= '				break;'."\n";
+  $output .= '				case "border":'."\n";
+  $output .= '					document.getElementById(\'border\').value = value;'."\n";
+  $output .= '				break;'."\n";
+  $output .= '				case "hspace":'."\n";
+  $output .= '					document.getElementById(\'hspace\').value = value;'."\n";
+  $output .= '				break;'."\n";
+  $output .= '				case "vspace":'."\n";
+  $output .= '					document.getElementById(\'vspace\').value = value;'."\n";
+  $output .= '				break;'."\n";
+  $output .= '				case "width":'."\n";
+  $output .= '					document.getElementById(\'width\').value = value;'."\n";
+  $output .= '				break;'."\n";
+  $output .= '				case "height":'."\n";
+  $output .= '					document.getElementById(\'height\').value = value;'."\n";
+  $output .= '				break;				'."\n";
+  $output .= '			}'."\n";
+  $output .= '		}'."\n";
+  $output .= '	}'."\n";
+  $output .= '	'."\n";
+  $output .= '	// get width and height from style attribute in none IE browsers'."\n";
+  $output .= '	if(!WYSIWYG_Core.isMSIE && document.getElementById(\'width\').value == "" && document.getElementById(\'width\').value == "") {'."\n";
+  $output .= '		document.getElementById(\'width\').value = img.style.width.replace(/px/, "");'."\n";
+  $output .= '		document.getElementById(\'height\').value = img.style.height.replace(/px/, "");'."\n";
+  $output .= '	}'."\n";
+  $output .= '}'."\n";
+  
+  $output .= '// ---------------------------------------------------------------------- '."\n";
+  $output .= '//  Function    : Select an item of an select box element by value.'."\n";
+  $output .= '// ---------------------------------------------------------------------- '."\n";
+  $output .= 'function selectItemByValue(element, value) {'."\n";
+  $output .= '	if(element.options.length) {'."\n";
+  $output .= '		for(var i=0;i<element.options.length;i++) {'."\n";
+  $output .= '			if(element.options[i].value == value) {'."\n";
+  $output .= '				element.options[i].selected = true;'."\n";
+  $output .= '			}'."\n";
+  $output .= '		}'."\n";
+  $output .= '	}'."\n";
+  $output .= '}'."\n";
+  
+  $output .= 'function browseImage() {'."\n";
+  $output .= '  window.open(\''.$base_path.'openwysiwyg/image_browse\', \'browseImage\', \'location=0,status=0,scrollbars=1,width=600,height=500,top=100,left=100\').focus();'."\n";
+  $output .= '}'."\n";
+
+  $output .= '</script>';
+  $output .= '</head>';
+  $output .= '<body bgcolor="#EEEEEE" marginwidth="0" marginheight="0" topmargin="0" leftmargin="0" onLoad="loadImage();">';
+  
+	$output .= '<table border="0" cellpadding="0" cellspacing="0" style="padding: 10px;"><tr><td>';
+
+  $output .= '<span style="font-size: 11px; font-weight: bold;">Insert Image</span>';
+  $output .= '<table width="380" border="0" cellpadding="0" cellspacing="0" style="background:#F7F7F7; border:2px solid white;padding:5px;">';
+  $output .= ' <tr>';
+  $output .= '  <td style="padding:1px; font-size: 11px;" width="80">Image URL</td>';
+  $output .= '	<td style="padding:1px;" width="260"><input type="text" name="src" id="src" value="" style="font-size: 10px; width:100%;"/></td>';
+  $output .= '	';
+  $output .= '	<td>';
+  if (user_access('file browse')) {
+    $output .= '	  <input type="button" value="Browse" onclick="browseImage();" style="font-size: 12px;" />';
+  }
+	$output .= '	</td>';
+  $output .= '	';
+  $output .= ' </tr>';
+  $output .= ' <tr>';
+  $output .= '  <td style="padding:1px; font-size: 11px;">Alt Text</td>';
+  $output .= '	<td style="padding:1px;"><input type="text" name="alt" id="alt" value="" style="font-size:10px; width: 100%;"/></td>';
+  $output .= ' <td></td>';
+  $output .= ' </tr>';
+  $output .= '</table>';
+  $output .= '	';
+
+  $output .= '<table width="380" border="0" cellpadding="0" cellspacing="0" style="margin-top: 10px;"><tr><td style="vertical-align:top;">';
+
+  $output .= '<span style="font-size: 11px; font-weight: bold;">Layout</span>';
+  $output .= '<table width="180" border="0" cellpadding="0" cellspacing="0" style="background: #F7F7F7; border: 2px solid white; padding: 5px;">';
+  $output .= '<tr>';
+  $output .= '  <td style="padding:1px; font-size: 11px;">Width</td>';
+  $output .= '  <td style="width:60px;padding:1px;"><input type="text" name="width" id="width" value="" style="font-size:10px;width:100%;"/></td>';
+  $output .= ' </tr>';
+  $output .= ' <tr>';
+  $output .= '  <td style="padding:1px; font-size: 11px;">Height</td>';
+  $output .= '	<td style="padding:1px;"><input type="text" name="height" id="height" value="" style="font-size:10px;width: 100%;"/></td>';
+  $output .= ' </tr>';
+  $output .= ' <tr>';
+  $output .= '  <td style="padding:1px; font-size: 11px;">Border</td>';
+  $output .= '	<td style="padding:1px;"><input type="text" name="border" id="border" value="0"  style="font-size: 10px; width: 100%;"/></td>';
+  $output .= ' </tr>';
+  $output .= '</table>	';
+
+  $output .= '</td>';
+  $output .= '<td width="10">&nbsp;</td>';
+  $output .= '<td style="vertical-align:top;">';
+
+  $output .= '<span style="font-size: 11px; font-weight: bold;">&nbsp;</span>';
+  $output .= '<table width="190" border="0" cellpadding="0" cellspacing="0" style="background: #F7F7F7; border: 2px solid white; padding: 5px;">';
+  $output .= '<tr>';
+  $output .= '  <td style="width: 90px;padding:1px; font-size: 11px;" width="100">Alignment</td>';
+  $output .= '	<td style="width: 95px;padding:1px;">';
+  $output .= '	<select name="align" id="align" style="font-size: 11px; width: 100%;">';
+  $output .= '	 <option value="">Not Set</option>';
+  $output .= '	 <option value="left">Left</option>';
+  $output .= '	 <option value="right">Right</option>';
+  $output .= '	 <option value="texttop">Texttop</option>';
+  $output .= '	 <option value="absmiddle">Absmiddle</option>';
+  $output .= '	 <option value="baseline">Baseline</option>';
+  $output .= '	 <option value="absbottom">Absbottom</option>';
+  $output .= '	 <option value="bottom">Bottom</option>';
+  $output .= '	 <option value="middle">Middle</option>';
+  $output .= '	 <option value="top">Top</option>';
+  $output .= '	</select>';
+  $output .= '	</td>';
+  $output .= ' </tr>';
+  $output .= ' <tr>';
+  $output .= '  <td style="padding:1px; font-size: 11px;">H Space</td>';
+  $output .= '	<td style="padding:1px;"><input type="text" name="hspace" id="hspace" value=""  style="font-size: 10px; width: 100%;"/></td>';
+  $output .= ' </tr>';
+  $output .= ' <tr>';
+  $output .= '  <td style="padding:1px; font-size: 11px;">V Space</td>';
+  $output .= '	<td style="padding:1px;"><input type="text" name="vspace" id="vspace" value=""  style="font-size: 10px; width: 100%;"/></td>';
+  $output .= ' </tr>';
+  $output .= '</table>	';
+
+  $output .= '</td></tr></table>';
+
+  $output .= '<div align="right" style="padding-top: 5px;"><input type="submit" value="  Submit  " onClick="insertImage();" style="font-size: 12px;" />&nbsp;<input type="submit" value="  Cancel  " onClick="window.close();" style="font-size: 12px;" /></div>';
+
+  $output .= '</td></tr></table>';
+
+  $output .= '</body>';
+  $output .= '</html>';
+  print $output;	
+  exit;
+}
+
+function openwysiwyg_ow_image_browse($error_msg) {
+  global $user;
+  
+  if (!user_access('access openwysiwyg')) { return; }
+  
+  if (!user_access('file browse')) {
+    print t("Sorry, you have no 'File Browse' access.")."<hr>";
+	  print '<input type="submit" value=" Close " onClick="window.close();" />'; 	
+	  exit();
+  }	
+	
+	$folder_name = $_REQUEST['folder_name'];
+  $sub_folder  = $_REQUEST['sub_folder'];
+  
+  $uid = $user->uid;
+  $name = $user->name;
+  $base_path = base_path();
+  $openwysiwyg_path = $base_path.drupal_get_path('module', 'openwysiwyg'); 
+  $files_path = file_directory_path();
+  $openwysiwyg_folder_format = variable_get('openwysiwyg_folder_format', 'u[uid]');
+  
+  $openwysiwyg_folder_format = str_replace('[uid]',$uid,$openwysiwyg_folder_format);
+  $openwysiwyg_folder_format = str_replace('[username]',$name,$openwysiwyg_folder_format);
+  $openwysiwyg_folder_format = str_replace('[domainname]',$_SERVER['HTTP_HOST'],$openwysiwyg_folder_format);
+  
+  $user_dir = "$files_path/$openwysiwyg_folder_format";	
+  
+  if ($folder_name=='') {
+	  $folder_name = "$files_path/$openwysiwyg_folder_format";
+    //Check and create user folder
+    if (file_exists($folder_name)) { 
+	    if (!is_dir($folder_name)) { mkdir($folder_name);	}
+    } else { mkdir($folder_name);	}		
+  } else {
+    if ($sub_folder!='') { $folder_name = $folder_name."/".$sub_folder; }
+	  if (strpos($folder_name, '/..')) {
+	    $folder_name = str_replace('/..','', $folder_name);
+	    $pos = 0;
+	    while(strpos($folder_name,'/',$pos) ) {
+        $pos++;
+      }
+      if ($pos!=0) { $pos=$pos-1;}
+      $folder_name = substr($folder_name,0,$pos);
+    }
+  }
+  //Folder manager
+  if (!user_access('folder manage')) {
+	if (!strpos($dir,$user_dir)) {
+	  $error_msg = t("Sorry, you have no 'folder manage' access, you only can browse to your own folder.");
+	  $folder_name = $user_dir;
+	}	
+  }
+  
+  $dir = $folder_name;
+
+  //Form of Image Browse
+  $output  = '';
+  $output .= '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">';
+
+  $output .= '<html>';
+  $output .= '<head>';
+  $output .= '<title>openWYSIWYG | Insert or Modify Image</title>';
+
+  $output .= '<style media="all" type="text/css">';
+  $output .= '@import "'.$openwysiwyg_path.'/library/styles/'.variable_get("openwysiwyg_style","openwysiwyg.css").'";';
+  $output .= '</style>';
+	$output .= '<script language="JavaScript" type="text/javascript">';
+  
+	$output .= '// ----------------------------------------------------------------------'."\n";
+  $output .= '//  Function    : Inserts image into the WYSIWYG.'."\n";
+  $output .= '// ----------------------------------------------------------------------'."\n";
+  
+  $output .= "function fillImageForm(imgS,imgW,imgH) { \n";
+  $output .= "  window.opener.GetValueFromChild(imgS,imgW,imgH); \n";
+  $output .= "  window.close(); \n";
+  $output .= "  return false; \n";
+  $output .= "}\n\n";
+  
+  $output .= "function confSubmit(form) { \n";
+  $output .= "  if (confirm('Are you sure?')) { \n";
+  $output .= "    form.submit(); \n";
+  $output .= "  }\n";  
+  $output .= "}\n\n";
+  
+  $output .= '</script>';
+  $output .= '</head>';
+  $output .= '<body bgcolor="#EEEEEE">';
+  
+  if ($error_msg) { $output .= "<div id='error_msg'>$error_msg</div>"; }
+  
+  //Folder Navigation
+  $output .= "<form action='".url("openwysiwyg/image_browse")."' name='folder_nav' id='folder_nav' method='post' style='margin-bottom:2px;'>";
+  $output .= '<table border=0 width="100%" style="border:solid 2px #FFF; background:#F7F7F7;">';
+  $output .= '<tr>';
+  $output .= '<td style="font-size: 11px;">';
+	$output .= t('Current Folder').": $folder_name".' <select name="sub_folder" id="sub_folder" style="font-size: 11px;">';
+  foreach (list_dir($dir) as $value) {
+    $output .= "	 <option value='$value' ".($value==$sub_folder ? " selected='selected'" : '').">$value</option>";
+	}
+	$output .= '</select>';
+	$output .= '<input type="submit" value="Change folder" style="font-size: 11px;"/>';
+	$output .= '<input type="hidden" name="folder_name" value="'. $folder_name.'" />';
+	$output .= '<input type="hidden" name="token" value="'. $token .'" />';
+	$output .= '</td>';
+	$output .= '</tr>';
+  $output .= '</table>';
+  $output .= '</form>';  
+  
+	//Folder create
+	if (user_access('folder create')) {
+	  $output .= '<form name="folder_create" action="'.url("openwysiwyg/folder_create").'" method="post" id="folder_create" enctype="multipart/form-data" style="margin-bottom:2px;">';
+    $output .= '<table border=0 width="100%" style="border:solid 2px #FFF; background:#F7F7F7;">';
+    $output .= '<tr>';
+    $output .= '<td style="font-size: 11px;">'.t('Sub folder name').'</td>';
+    // $output . = '<input type="hidden" name="token" value="'. $token .'" />';
+    $output .= "<input type='hidden' name='folder_name' value='$folder_name' />";
+    $output .= '<td><input type="text" name="new_folder" id="new_folder" value="" style="font-size: 11px;width:100%"/></td>';
+    $output .= '<td><input type="submit" name="folder_create" value="'.t('Create sub folder').'" style="font-size: 11px;"/></td>';
+    $output .= '</tr>';
+    $output .= '</table>';
+    $output .= '</form>';
+	}
+	
+	if (user_access('file upload')) {
+	  $output .= '<form name="form_upload" action="'.url("openwysiwyg/file_upload").'" method="post" id="uploadform" enctype="multipart/form-data">';
+    $output .= '<table border=0 width="100%" style="border:solid 2px #FFF; background:#F7F7F7;">';
+    $output .= '<tr>';
+    $output .= '<td style="font-size: 11px;">'.t('File to upload').'</td>';
+		$output .= '<td><input type="file" name="file_upload" id="file_upload" size=25 style="font-size: 11px;"/></td>';
+    $output .= "<input type='hidden' name='folder_name' value='$folder_name' />";
+    //$output .= '<input type="hidden" name="sub_folder" value="'. $sub_folder .'" />';
+    $output .= '<td><input type="submit" name="file_upload" value="'.t('Upload Now').'" style="font-size: 11px;"/></td>';
+    $output .= '</tr>';
+    $output .= '</table>';
+    $output .= '</form>';
+	}
+  
+  if(is_dir($dir)) {
+    if($handle = opendir($dir)) { 
+      $output .= "<table cellspacing=0 style='border:solid 2px #AAAAAA;' width='100%'>";
+      $output .= "<tr bgcolor='#B4B4B4'>";
+      $output .= "<td style='font-size: 11px;'><b>#</b></td>";
+			$output .= "<td style='font-size: 11px;'><b>FILE NAME</b></td>";
+			$output .= "<td style='font-size: 11px;' align='right' width='100'><b>SIZE (KB)</b></td>";
+			$output .= "<td style='font-size: 11px;' align='right'><b>DIMENSION</b></td>";
+			$output .= "<td style='font-size: 11px;' align='center' colspan='3'><b>ACTION</b></td>";
+			$output .= "</tr>";
+			$folder_size = 0;
+			$i = 0;
+      while(($file = readdir($handle)) !== false) {
+        if(!is_dir("$dir/$file") && $file != "." && $file != ".." && $file != "Thumbs.db" && $file!=".htaccess") {
+          $i++;
+          if ($i % 2) { $bgcolor='#FFFFFF';} else { $bgcolor="#DDDDDD";} 
+          $output .= "<tr bgcolor='$bgcolor'>";
+          $file_path = "$dir/$file";
+          $file_url  = "$base_path$dir/$file";
+          $file_size = number_format(filesize($file_path)/1024,1);
+          $folder_size += $file_size;
+          list($imgW,$imgH) = @getimagesize($file_path);
+          $output .= "<td style='font-size: 11px;' align='right'>$i.</td>";
+					$output .= "<td style='font-size: 11px;'>$file</td>";
+					$output .= "<td style='font-size: 11px;' align='right'>$file_size </td>";
+					$output .= "<td style='font-size: 11px;' align='right'>$imgW x $imgH &nbsp;</td>";
+					
+					$output .= "<td style='font-size: 11px;margin:0;padding:0;' align='center' width=10 valign='center'>";
+					$output .= "<form name='form_insert' method='post' style='margin:0;'>";
+					$output .= "<input type='submit' value='Insert' onClick=\"fillImageForm('$file_url',$imgW,$imgH); return false;\" style='font-size:11px;' />";
+					$output .= '</form>';
+					$output .= "</td>";
+					
+					if (user_access('file delete')) {
+					  $output .= "<td style='font-size: 11px;' align='center' width=10>";
+						$output .= "<form action='".url('openwysiwyg/file_delete')."' method='post' style='margin:0;'>";
+					  $output .= "<input type='hidden' name='folder_name' value='$folder_name' />";
+					  $output .= "<input type='hidden' name='file_name' value='$file' />";
+						$output .= '<input type="button" value="Delete" onclick="confSubmit(this.form);" style="font-size: 11px;">';
+						$output .= '</form>';
+						$output .= "</td>";
+					}
+					
+					if (user_access('file resize')) {
+					  $output .= "<td style='font-size: 11px;' align='center' width=10>";
+					  $output .= "<form action='".url('openwysiwyg/file_resize_form')."' method='post' style='margin:0;'>";
+					  $output .= '<input type="submit" name="resize" value="'.t('Resize').'" style="font-size: 11px;"/>';
+					  $output .= "<input type='hidden' name='folder_name' value='$folder_name' />";
+					  $output .= "<input type='hidden' name='file_name' value='$file' />";
+					  $output .= '</form></td>';
+					}
+				
+		      $output .= "</tr>";
+        }
+      }
+      $output .= "<tr bgcolor='#B4B4B4'>";
+      $output .= "<td style='font-size: 11px;'>&nbsp;</td>";
+      $output .= "<td style='font-size: 11px;' align='right'>Total</td>";
+			$output .= "<td style='font-size: 11px;' align='right'>".number_format($folder_size,1)."</td>";
+			$output .= "<td style='font-size: 11px;'>&nbsp;</td>";
+			$output .= "<td style='font-size: 11px;' align='center' colspan='3'>&nbsp;</td>";
+			$output .= "</tr>";
+      $output .= "</table>";
+      $output .= '</body>';
+      $output .= '</html>';
+      closedir($handle);
+  
+      print $output;
+      exit();
+    }
+  }
+}
+
+function openwysiwyg_ow_file_delete() {   
+  $folder_name = $_REQUEST['folder_name'];
+	$file_name = $_REQUEST['file_name']; 
+  
+  if (!user_access('access openwysiwyg') || !user_access('file delete')) { return; }
+  
+  if (file_delete("$folder_name/$file_name")) {
+    $error_msg = t("Success. File '$file_name' deleted.");
+  } else {
+    $error_msg = t("Error deleting file: $folder_name/$file_name");
+  }
+  openwysiwyg_ow_image_browse($error_msg);
+}
+
+function openwysiwyg_ow_file_upload() {
+  $folder_name = $_REQUEST['folder_name'];
+  $files       = $_FILES['file_upload'];
+	
+  if (!user_access('access openwysiwyg') || !user_access('file upload')) { return; }
+  
+  $file_name = $files["name"];
+  //File exists 
+  if (file_exists("$folder_name/$file_name")) {
+    $error_msg = t("Error. The '$file_name' already exists.");
+	  openwysiwyg_ow_image_browse($error_msg);return;
+	}
+  //File Extension
+	$pos = 0;
+	while( strpos($file_name,'.',$pos) ) {
+    $pos++;
+  }
+  if ($pos<>0) { $pos= $pos-1; }
+  $values = strtolower(str_replace(' ','',variable_get('openwysiwyg_file_extension','')));
+	if ($values<>'') {
+    $values_arr = split(',',$values);
+    $file_extension = substr($file_name,$pos);
+    
+    if(!in_array($file_extension,$values_arr)) {
+	    $error_msg = t("Error. File extension disallowed: $file_extension");
+	    openwysiwyg_ow_image_browse($error_msg);
+	    return; 
+	  } 
+  }
+  
+  //File dimension
+  $openwysiwyg_image_dimension = strtoupper(trim(variable_get('openwysiwyg_image_dimension','480x480')));
+  $pos=0;
+  $image_max_w = substr($openwysiwyg_image_dimension,0,$pos=strpos($openwysiwyg_image_dimension,'X',$pos));
+  $image_max_h = substr($openwysiwyg_image_dimension,$pos+1);
+  
+	list($imgW,$imgH) = @getimagesize($files['tmp_name']);
+	if ($openwysiwyg_image_dimension<>'' && ($imgW > $image_max_w || $imgH > $image_max_h)) {
+	  $image_max_h = ceil($imgH/$imgW * $image_max_w);
+	  if (!image_resize($files['tmp_name'], "$folder_name/$file_name", $image_max_w, $image_max_h)) {
+      $error_msg = t("Error. Can not resize file to $image_max_w x $image_max_h");
+	    openwysiwyg_ow_image_browse($error_msg);
+      return;	 
+    }		
+  } else {
+  //File move
+    if (!move_uploaded_file($files["tmp_name"],"$folder_name/$file_name")) {
+	    $error_msg = t("Error. Invalid file");
+	    openwysiwyg_ow_image_browse($error_msg);
+	    return;
+	  }	
+	}
+  //File size
+	$openwysiwyg_file_size = variable_get('openwysiwyg_file_size', '0');
+  if ($openwysiwyg_file_size) {
+	$upload_size= ceil(filesize("$folder_name/$file_name")/1024);
+	if ($upload_size > $openwysiwyg_file_size) {
+	  $error_msg = t("Error. Your file is: $upload_size KB. Maximum file size is: $openwysiwyg_file_size KB");
+	  file_delete("$folder_name/$file_name");
+	  openwysiwyg_ow_image_browse($error_msg);
+      return;	
+    }
+  }
+  
+  $error_msg = t("Success. File '$file_name' uploaded");
+  openwysiwyg_ow_image_browse($error_msg);
+  return;   
+}
+
+function list_dir($base_dir) {
+  if(!is_dir($base_dir)) { return; }
+  
+  if($handle = opendir($base_dir)) {
+    $result = array();
+    while(($file = readdir($handle)) !== false) {
+      if(is_dir("$base_dir/$file") && $file<>'.') { $result[] .= $file; }	
+	  }
+	}		
+	return $result;
+}
+
+function openwysiwyg_ow_folder_create() {
+  global $user;
+  
+  $folder_name = $_REQUEST['folder_name'];
+  $sub_folder  = $_REQUEST['sub_folder'];
+  $new_folder  = $_REQUEST['new_folder'];
+  
+  //print "Folder= $folder_name  Sub-folder= $sub_folder New-folder = $new_folder";
+  //exit();
+  
+  if (!user_access('access openwysiwyg') || !user_access('folder create')) { return; }
+  
+  $error_msg ='';
+  if ($new_folder=='') { openwysiwyg_ow_image_browse($error_msg);  }
+  
+  $uid = $user->uid;
+  $base_path = base_path();
+  $files_path = file_directory_path();
+  
+  $openwysiwyg_folder_format = variable_get('openwysiwyg_folder_format', 'u[uid]');
+  $openwysiwyg_folder_format = str_replace('[uid]',$uid,$openwysiwyg_folder_format);
+  $openwysiwyg_folder_format = str_replace('[username]',$name,$openwysiwyg_folder_format);
+  $openwysiwyg_folder_format = str_replace('[domainname]',$_SERVER['HTTP_HOST'],$openwysiwyg_folder_format);
+  
+  $user_dir = "$files_path/$openwysiwyg_folder_format";
+  $dir = "$folder_name/$new_folder";
+  
+  //Security check
+  if (strpos($dir,'..')) {
+    print t("Sorry. Invalid sub folder name.")."<hr>";
+	print '<input type="submit" value=" Close " onClick="window.close();" />';
+	exit();
+  }
+  //Folder manager
+  if (!user_access('folder manage')) {
+	if (!strpos($dir,$user_dir)) {
+	  print t("Sorry, you have no 'folder manage' access, you only can create folder into your own folder.");
+	  exit();
+	}	
+  }
+  
+  //Check and create user sub folder
+  $success = false;
+  if (file_exists("$dir")) { 
+	if (is_dir("$dir")) {
+	  $error_msg = t("Error. Sub folder '$new_folder' already exists.");
+	} else {
+	  if (mkdir($dir)) { 
+		$success = true;
+		$error_msg = t("Success. Create sub folder: $new_folder");
+	  } else {
+	    $error_msg = __line__.": ".t("Error. Can not create sub folder: $new_folder");
+	  } 
+	}
+  } else {
+	if (mkdir($dir)) { 
+	  $success = true;
+	  $error_msg = t("Success. Create sub folder: $new_folder");
+	} else {
+	  $error_msg = __line__.": ".t("Error. Can not create sub folder: $new_folder");
+	}
+  }
+  openwysiwyg_ow_image_browse($error_msg); 
+}
+
+function openwysiwyg_ow_file_resize_form() {
+  $folder_name = $_REQUEST['folder_name'];
+	$file_name = $_REQUEST['file_name']; 
+   
+  $openwysiwyg_file_resize_width = variable_get('openwysiwyg_file_resize_width', '100'); 
+  $openwysiwyg_file_resize_height = variable_get('openwysiwyg_file_resize_height', '');
+  
+  $output  = '';
+  $output .= '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">';
+  $output .= '<html>';
+  $output .= '<head>';
+  $output .= '<title>openWYSIWYG | Insert or Modify Image</title>';	
+  
+  $output .= '<script language="JavaScript" type="text/javascript">';
+  
+  $output .= "function confSubmit(form) { \n";
+  $output .= "  if (resize_name= form.resize_name.value=='') { \n";
+  $output .= "    if (confirm('This will replace existing File Name, are you sure?')) { \n";
+  $output .= "      form.submit(); \n";
+  $output .= "    }\n";  
+  $output .= "  }\n";
+  $output .= "}\n\n";
+  
+  $output .= '</script>';
+  $output .= '</head>';
+  
+  $output .= '<body bgcolor="#EEEEEE">';
+  $output .= "<form action='".url("openwysiwyg/file_resize_action")."' name='file_resize_form' id='file_resize_form' method='post' style='margin-bottom:2px;'>";
+  $output .= "<span style='font-size: 11px; font-weight: bold;'>Resize '$folder_name/$file_name' image to:</span>";
+  $output .= '<table width="100%" border="0" cellpadding="1" cellspacing="0" style="background: #F7F7F7;border:2px solid white;padding:5px;">';
+  $output .= '<tr>';
+  $output .= "<td width='50' style='font-size:11px;'>Width1:</td><td><input type='text' name='resize_width' id='resize_width' style='font-size:10px;' value='$openwysiwyg_file_resize_width'/></td>";
+  $output .= "<td style='font-size:11px;'>Height:</td><td><input type='text' name='resize_height' id='resize_height' style='font-size:10px;' value='$openwysiwyg_file_resize_height'/></td>";
+  $output .= '</tr>';
+  $output .= '<tr><td colspan="4" style="font-size:11px;">'.t('* Proportional width: fill only the <b>Width</b> field, leave Height blank').'</td></tr>';
+  $output .= '<tr><td colspan="4" style="font-size:11px;">'.t('* Proportional height: fill only the <b>Height</b> field, leave Width blank').'</td></tr>';
+  $output .= '</table>';
+  $output .= '<table width="100%" border="0" cellpadding="1" cellspacing="0" style="background: #F7F7F7;border:2px solid white;padding:5px;">';
+	$output .= '<tr>';
+  $output .= '  <td width="50" style="font-size:11px;">File name:</td>';
+	$output .= '  <td style="font-size:10px;"><input type="text" name="resize_name" id="resize_name" value="" style="font-size:10px;width:100%;"/>';
+	$output .= ' </tr>';
+	$output .= ' <tr>';
+	$output .= '<td colspan="2" style="font-size:11px;">'.t("* Leave blank if you want to use original file name!");
+	$output .= '</td>';
+  $output .= ' </tr>';
+  $output .= '</table><br>';
+  $output .= '<input type="hidden" name="file_name" value="'.$file_name.'" />';
+  $output .= '<input type="hidden" name="folder_name" value="'.$folder_name.'" />';
+  $output .= "<input type='button' name='resize' value='".t('Resize now')."' onclick=\"confSubmit(this.form);\" style='font-size: 11px;'/>";
+  $output .= '<input type="button" value=" Back" onClick="history.go(-1);" style="font-size: 11px;"/>';
+  $output .= "</form>";
+  
+  $output .= '</body>';
+  print $output;
+  exit();
+}
+
+function openwysiwyg_ow_file_resize_action() { 
+  $folder_name = $_REQUEST['folder_name'];
+	$file_name = $_REQUEST['file_name']; 
+	$resize_width = $_REQUEST['resize_width'];
+  $resize_height = $_REQUEST['resize_height'];
+  $resize_name = $_REQUEST['resize_name'];
+ 
+  $old_file = "$folder_name/$file_name";
+  $new_file = "$folder_name/".($resize_name!='' ? $resize_name : $file_name);
+  
+  list($imgW,$imgH) = @getimagesize("$folder_name/$file_name");
+  
+  if ($resize_width=='')  {$resize_width  = ceil($imgW/$imgH * $resize_height);}
+  if ($resize_height=='') {$resize_height = ceil($imgH/$imgW * $resize_width); }
+  
+  if (image_resize("$old_file","$new_file",$resize_width,$resize_height)) {
+	  $error_msg= t("Success. Resize file '$old_file' ($imgW x $imgH) to '$new_file' ($resize_width x $resize_height).");
+	} else {
+	  $error_msg= t("Error. Can not resize file '$old_file' ($imgW x $imgH) to '$new_file' ($resize_width x $resize_height).");	
+	}
+	openwysiwyg_ow_image_browse($error_msg); 
+	exit();	
+}
